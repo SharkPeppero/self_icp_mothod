@@ -21,6 +21,32 @@ endif ()
 
 set(CMAKE_BUILD_TYPE "Debug")
 
+# set cuda options
+option(USE_CUDA "Use cuda or not" ON)
+if (USE_CUDA)
+    MESSAGE("Use cuda to do image processing.")
+    add_definitions(-DUSE_CUDA)
+
+    # add_definitions(-DLANDMARK_PARRALE)
+
+    set(CMAKE_NVCC_FLAGS "CMAKE_NVCC_FLAGS -std=c++14")
+
+    if("${CMAKE_HOST_SYSTEM_PROCESSOR}" STREQUAL "aarch64")
+        link_directories(usr/local/cuda-10.2/targets/aarch64-linux/lib)
+        add_definitions(-D BUILD_ON_XAVIER)
+    elseif("${CMAKE_HOST_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
+        link_directories(usr/local/cuda-11.1/targets/x86_64-linux/lib)
+        add_definitions(-D BUILD_ON_X86)
+    endif()
+
+    find_package(CUDA REQUIRED)
+    include_directories(${CUDA_INCLUDE_DIRS})
+
+    find_cuda_helper_libs(nppig)
+    find_cuda_helper_libs(nppidei)
+    set(CUDA_npp_LIBRARY "${CUDA_nppc_LIBRARY};${CUDA_nppig_LIBRARY};${CUDA_nppidei_LIBRARY}")
+endif(USE_CUDA)
+
 include_directories(
         "${PROJECT_SOURCE_DIR}/include"
 )
