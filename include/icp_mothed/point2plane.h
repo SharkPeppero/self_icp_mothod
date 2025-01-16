@@ -1,27 +1,28 @@
 //
-// Created by westwell on 25-1-15.
+// Created by westwell on 25-1-16.
 //
 
-#ifndef EIGEN_ICP_POINT2POINT_H
-#define EIGEN_ICP_POINT2POINT_H
+#ifndef EIGEN_ICP_POINT2PLANE_H
+#define EIGEN_ICP_POINT2PLANE_H
 
 #include "registration_base.h"
 
 /**
- * @brief 点到点的icp
+ * 点到平面距离残差的ICP
  */
-
 namespace Registration {
-    class Point2PointRegistration : public RegistrationBase {
+    class Point2PlaneRegistration : public RegistrationBase {
     public:
-        Point2PointRegistration() {
-            registration_mode_ = RegistrationMode::Point2Point;
+        Point2PlaneRegistration() {
+            registration_mode_ = RegistrationMode::Point2Plane;
 
             iterations_ = 10;
             epsilon_ = 1e-6;
             init_T_ = Eigen::Matrix4d::Identity();
             nearest_dist_ = 5.0;
             use_tbb_flag_ = false;
+            point2plane_dist_thresh_ = 0.05;
+            knn_cnt_ = 50;
 
             convergence_flag_ = true;
             final_T_ = Eigen::Matrix4d::Identity();
@@ -30,7 +31,7 @@ namespace Registration {
             target_cloud_ptr_ = boost::make_shared<pcl::PointCloud<pcl::PointXYZI>>();
         }
 
-        ~Point2PointRegistration() override = default;
+        ~Point2PlaneRegistration() override = default;
 
         // 配置参数
         void setIterations(int iterations) override { iterations_ = iterations; }
@@ -52,20 +53,23 @@ namespace Registration {
 
         // 打印参数
         void logParameter() override {
-            std::cout << " Point2Point Parameters: " << std::endl;
-            std::cout << "  registration mode: " << getRegistrationMode(registration_mode_) << std::endl;
+            std::cout << " Point2Plane Parameters: " << std::endl;
+            std::cout << "  Mode: " << getRegistrationMode(registration_mode_) << std::endl;
             std::cout << "  iterations: " << iterations_ << std::endl;
             std::cout << std::fixed << std::setprecision(9) << "  epsilon: " << epsilon_ << std::endl;
             std::cout << "  nearest_dist: " << nearest_dist_ << std::endl;
+            std::cout << "  point2plane_dist_thresh: " << point2plane_dist_thresh_ << std::endl;
+            std::cout << "  knn_cnt: " << knn_cnt_ << std::endl;
             std::cout << "  use_tbb_flag: " << (use_tbb_flag_ ? "true" : "false") << std::endl;
         }
 
-        // 点到点的icp
+        // 点到面的icp
         bool Handle() override {
             // 断言检测
-            assert(!target_cloud_ptr_->points.empty() && !source_cloud_ptr_->points.empty());
+            assert(!target_cloud_ptr_->points.empty());
+            assert(!source_cloud_ptr_->points.empty());
 
-            // 构建目标点云的Kdtree
+            // 构建目标点云的 kdtree
             pcl::KdTreeFLANN<pcl::PointXYZI> target_KDtree;
             target_KDtree.setInputCloud(target_cloud_ptr_);
 
@@ -76,10 +80,10 @@ namespace Registration {
             double last_mean_residual = 1e10;
 
             for (int iter = 0; iter < iterations_; ++iter) {
+
                 double res_mean = 0;
                 int effect_cnt = 0;
-
-                // 存储  JT * J  以及 -1 * J * err
+                // 存储  JT * J  以及 -1 * JT * err
                 std::pair<Eigen::Matrix<double, 6, 6>, Eigen::Matrix<double, 6, 1>> H_and_err =
                         std::make_pair(Eigen::Matrix<double, 6, 6>::Zero(), Eigen::Matrix<double, 6, 1>::Zero());
 
@@ -87,45 +91,60 @@ namespace Registration {
                 pcl::transformPointCloud(*source_cloud_ptr_, *transformed_cloud_ptr, final_T_);
 
                 // 计算最近邻，计算雅阁比
-                for (int index = 0; index < source_cloud_ptr_->points.size(); ++index) {
+                for (size_t index = 0; index < source_cloud_ptr_->points.size(); ++index) {
 
                     // 最近邻查询
                     pcl::PointXYZI &transformed_point = transformed_cloud_ptr->points[index];
                     std::vector<int> index_vec;
                     std::vector<float> dist_vec;
-                    int num_found = target_KDtree.nearestKSearch(transformed_point, 1, index_vec, dist_vec);
+                    int num_found = target_KDtree.nearestKSearch(transformed_point, 50, index_vec, dist_vec);
 
-                    // 判断点点关联是否可以有效
-                    auto checkEffective = [&index_vec, &dist_vec, this]() -> bool {
-                        return (!index_vec.empty() && dist_vec.front() < nearest_dist_);
-                    };
+                    // 最近邻搜索的check
+                    if (!index_vec.empty() && dist_vec.front() < nearest_dist_) {
 
-                    if (checkEffective()) {
+                        // 直线拟合的check
+                        std::vector<Eigen::Vector3d> searched_points;
+                        for (const auto &point_index: index_vec) {
+                            searched_points.emplace_back(target_cloud_ptr_->points[point_index].x,
+                                                         target_cloud_ptr_->points[point_index].y,
+                                                         target_cloud_ptr_->points[point_index].z);
+                        }
+                        Eigen::Vector3d center_point;
+                        Eigen::Vector4d normal_est;
+                        if (GeometryMath::estimate_plane(searched_points, point2plane_dist_thresh_, center_point,
+                                                         normal_est)) {
+                            // 记录变换后的激光点位置
+                            Eigen::Vector3d transformed_point_eigen(transformed_point.x, transformed_point.y,
+                                                                    transformed_point.z);
 
-                        // 记录最近邻的target点 p
-                        pcl::PointXYZI &knn_target_point = target_cloud_ptr_->points[index_vec[0]];
-                        Eigen::Vector3d target_point_eigen(knn_target_point.x, knn_target_point.y, knn_target_point.z);
-                        // 记录变换后的激光点位置
-                        Eigen::Vector3d transformed_point_eigen(transformed_point.x, transformed_point.y, transformed_point.z);
-                        // 构建误差 err
-                        Eigen::Vector3d err = target_point_eigen - transformed_point_eigen;
+                            Eigen::Vector3d normal_vec = normal_est.head(3);
 
-                        // 原始激光点位置
-                        pcl::PointXYZI &origin_point = source_cloud_ptr_->points[index];
-                        Eigen::Vector3d origin_point_eigen(origin_point.x, origin_point.y, origin_point.z);
+                            // 水平投影矩阵 Vertical Projection Matrices
+                            Eigen::Matrix3d horizon_projection_matrix =
+                                    normal_vec * normal_vec.transpose() / (normal_vec.transpose() * normal_vec);
 
-                        // 构建雅阁比 J
-                        Eigen::Matrix<double, 3, 6> J;
-                        J.block<3, 3>(0, 0) = final_T_.block<3, 3>(0, 0) * manifold_math::skew_sym_mat(origin_point_eigen);
-                        J.block<3, 3>(0, 3) = -Eigen::Matrix3d::Identity();
 
-                        // 更新海森矩阵
-                        H_and_err.first += J.transpose() * J;
-                        H_and_err.second += -1.0 * J.transpose() * err;
+                            // 计算向量到直线的距离
+                            Eigen::Vector3d err = horizon_projection_matrix * (transformed_point_eigen - center_point);
 
-                        // 残差的均值递归求解
-                        effect_cnt++;
-                        res_mean = res_mean + (err.norm() - res_mean) / effect_cnt;
+                            // 原始激光点位置
+                            pcl::PointXYZI &origin_point = source_cloud_ptr_->points[index];
+                            Eigen::Vector3d origin_point_eigen(origin_point.x, origin_point.y, origin_point.z);
+
+                            // 构建雅阁比 J
+                            Eigen::Matrix<double, 3, 6> J;
+                            J.block<3, 3>(0, 0) = -1.0 * horizon_projection_matrix * final_T_.block<3, 3>(0, 0) *
+                                                  manifold_math::skew_sym_mat(origin_point_eigen);
+                            J.block<3, 3>(0, 3) = horizon_projection_matrix;
+
+                            // 更新海森矩阵
+                            H_and_err.first += J.transpose() * J;
+                            H_and_err.second += -1.0 * J.transpose() * err;
+
+                            // 残差的均值递归求解
+                            effect_cnt++;
+                            res_mean = res_mean + (err.norm() - res_mean) / effect_cnt;
+                        }
 
                     }
 
@@ -147,15 +166,12 @@ namespace Registration {
                     last_mean_residual = res_mean;
 
                 } else {
-                    std::cout << "[point2point] iter: " << iter << ", res: " << res_mean << std::endl;
+                    std::cout << "RegistrationMode: " << getRegistrationMode(registration_mode_)  << " iter: " << iter << ", res: " << res_mean << std::endl;
                     std::cout << "  [Error] registration gradient descent anomaly, ready to exit..." << std::endl;
                     break;
                 }
             }
         }
-
-
-
 
         // 获取最终的外参
         void getRegistrationTransform(Eigen::Matrix4d &option_transform) override { option_transform = final_T_; }
@@ -166,7 +182,10 @@ namespace Registration {
         };
 
 
+        double point2plane_dist_thresh_;
+        int knn_cnt_;
+
     };
 }
 
-#endif //EIGEN_ICP_POINT2POINT_H
+#endif //EIGEN_ICP_POINT2PLANE_H
