@@ -35,8 +35,11 @@ namespace Registration {
 
         // 配置参数
         void setIterations(int iterations) override { iterations_ = iterations; }
-        void setEpsilon(int epsilon) override { epsilon_ = epsilon; }
+
+        void setEpsilon(double epsilon) override { epsilon_ = epsilon; }
+
         void setNearestDist(double nearest_dist) override { nearest_dist_ = nearest_dist; }
+
         void setTBBFlag(bool use_tbb_flag) override { use_tbb_flag_ = use_tbb_flag; }
 
         // 配置输入参数
@@ -234,7 +237,7 @@ namespace Registration {
         void getRegistrationTransform(Eigen::Matrix4d &option_transform) override { option_transform = final_T_; }
 
         // 获取origin变换后的点云
-        void getTransformedOriginCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr& transformed_cloud) override {
+        void getTransformedOriginCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &transformed_cloud) override {
             pcl::io::savePCDFileBinary("/home/westwell/AJbin/self_icp_mothod/before_transformed.pcd",
                                        *source_cloud_ptr_);
             std::cout << "final_T: " << std::endl;
