@@ -278,18 +278,14 @@ namespace Registration {
 
         // 参数配置
         virtual void setIterations(int iterations) {}       // 优化的迭代次数
-
         virtual void setEpsilon(double epsilon) {}          // 迭代优化终止的epsilon
-
         virtual void setNearestDist(double nearest_dist) {} // 最近邻查询的距离
-
         virtual void setTBBFlag(bool use_tbb_flag) {}       // 是否使用TBB加速
+        virtual void setLogFlag(bool use_log_flag) {}       // 是否参数打印
 
         // 配置输入的参数
         virtual void setSourceCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &source_cloud_ptr) {}
-
         virtual void setTargetCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &target_cloud_ptr) {}
-
         virtual void setInitT(const Eigen::Matrix4d &init_T) {}
 
         // 打印参数
@@ -306,16 +302,17 @@ namespace Registration {
         RegistrationMode registration_mode_; // 配准模式
 
         int iterations_;    // 迭代次数
-        double epsilon_;    // 位移量的epsilon
+        double epsilon_;    // 位移量的epsilon 位姿变换足够小停止迭代
         double nearest_dist_; // 最近邻查询距离
-        Eigen::Matrix4d init_T_; // 初始外参
         bool use_tbb_flag_; // 是否使用TBB加速
+        bool use_log_flag_;
 
+        Eigen::Matrix4d init_T_; // 初始外参
         pcl::PointCloud<pcl::PointXYZI>::Ptr target_cloud_ptr_ = nullptr;
         pcl::PointCloud<pcl::PointXYZI>::Ptr source_cloud_ptr_ = nullptr;
 
-        bool convergence_flag_; // 是否收敛
         Eigen::Matrix4d final_T_; // 最终的外参
+        bool convergence_flag_; // 是否收敛
     };
 }
 
