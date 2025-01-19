@@ -94,7 +94,7 @@ struct VoxelData {
     }*/
   }
 
-  //
+  // 计算信息矩阵作为加权的依据
   Eigen::Matrix3d getInformation(){
     return  (covariance_matrix_ + Eigen::Matrix3d::Identity() * 1e-3).inverse();
   }
@@ -165,7 +165,10 @@ class NDTAligned : public RegistrationBase {
     target_cloud_ptr_ = target_cloud_ptr;
   }
   void setInitT(const Eigen::Matrix4d &init_T) override {
+    std::cout << __LINE__ << std::endl;
     init_T_ = init_T;
+    std::cout << init_T.matrix() << std::endl;
+    std::cout << init_T_.matrix() << std::endl;
   }
 
   // 进行target点云的Voxel构建
@@ -243,6 +246,13 @@ class NDTAligned : public RegistrationBase {
     assert(!target_cloud_ptr_->points.empty());
     assert(!source_cloud_ptr_->points.empty());
 
+    std::cout << "init_T: " << std::endl;
+    std::cout << init_T_.matrix() << std::endl;
+
+    final_T_ = init_T_;
+    std::cout << "final_T: " << std::endl;
+    std::cout << final_T_.matrix() << std::endl;
+
     // 拆解target点云的voxel
     buildVoxels();
     std::cout << "--完成Target点云体素分解,voxel size: " << feature_map.size() << std::endl;
@@ -261,9 +271,6 @@ class NDTAligned : public RegistrationBase {
     buildNearbyType();
     std::cout << "--完成NearbyType分解,nearby range size: " << nearby_search_range_.size() << std::endl;
 
-    // 初始化每一轮外参变换后的transformed_cloud
-    pcl::PointCloud<pcl::PointXYZI>::Ptr transformed_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>());
-
     // 迭代残差
     double last_mean_residual = 1e10;
 
@@ -279,6 +286,8 @@ class NDTAligned : public RegistrationBase {
       double latest_residual_mean = 0.0;
 
       // 对原始点云进行变换
+      // 初始化每一轮外参变换后的transformed_cloud
+      pcl::PointCloud<pcl::PointXYZI>::Ptr transformed_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>());
       pcl::transformPointCloud(*source_cloud_ptr_, *transformed_cloud_ptr, final_T_);
 
       // 构建残差表达：构建加权的最小二乘
@@ -313,6 +322,7 @@ class NDTAligned : public RegistrationBase {
           auto iter = feature_map.find(position_key);
           if (iter != feature_map.end()) {
 
+            //
             pcl::PointXYZI point_tmp;
             point_tmp.x = transformed_point_eigen.x();
             point_tmp.y = transformed_point_eigen.y();

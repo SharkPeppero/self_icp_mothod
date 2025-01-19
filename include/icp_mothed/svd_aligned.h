@@ -15,6 +15,7 @@ namespace Registration {
 
 class SVDAligned : public RegistrationBase {
  public:
+
   SVDAligned() {
     // 当前ICP的模式
     registration_mode_ = RegistrationMode::SVD_ALIGNED;
@@ -44,13 +45,6 @@ class SVDAligned : public RegistrationBase {
   void setNearestDist(double nearest_dist) override { nearest_dist_ = nearest_dist; }
   void setTBBFlag(bool use_tbb_flag) override { use_tbb_flag_ = use_tbb_flag; }
   void setLogFlag(bool use_log_flag) override { use_log_flag_ = use_log_flag; }
-
-  // 输入数据接口
-  void setSourceCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &source_cloud_ptr) override { source_cloud_ptr_ = source_cloud_ptr; }
-  void setTargetCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &target_cloud_ptr) override { target_cloud_ptr_ = target_cloud_ptr; }
-  void setInitT(const Eigen::Matrix4d &init_T) override { init_T_ = init_T; }
-
-  // 打印参数
   void logParameter() override {
     std::cout << "  Registration Mode: " << getRegistrationMode(registration_mode_) << std::endl;
     std::cout << "  iterations: " << iterations_ << std::endl;
@@ -60,15 +54,24 @@ class SVDAligned : public RegistrationBase {
     std::cout << "  init_T_target_source: " << std::endl << init_T_.matrix() << std::endl;
   }
 
-  // 输入的target以及source是已经配对好的
+  // 配置输入的参数
+  void setSourceCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &source_cloud_ptr) override { source_cloud_ptr_ = source_cloud_ptr; }
+  void setTargetCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &target_cloud_ptr) override { target_cloud_ptr_ = target_cloud_ptr; }
+  void setInitT(const Eigen::Matrix4d &init_T) override { init_T_ = init_T; }
+
+  // 已知配对点对求解变换的外参
   bool correspondHandle() {
 
+    // 参数打印
+    if (use_log_flag_)
+      logParameter();
+
     // 断言检测
-    assert(target_cloud_ptr_->points.empty());
-    assert(source_cloud_ptr_->points.empty());
+    assert(target_cloud_ptr_->points.empty() && target_cloud_ptr_ != nullptr);
+    assert(source_cloud_ptr_->points.empty() && source_cloud_ptr_ != nullptr);
     assert(target_cloud_ptr_->points.size() == source_cloud_ptr_->points.size());
 
-    auto start = std::chrono::steady_clock::now();
+    tools::Tictoc correspondHandle_timer;
 
     // 组织SVD数据
     std::vector<Eigen::Vector3d> origin_correspond; // 原始点云的激光点数据
@@ -125,14 +128,12 @@ class SVDAligned : public RegistrationBase {
     final_T_.block<3, 3>(0, 0) = R;
     final_T_.block<3, 1>(0, 3) = t;
 
-    auto end = std::chrono::steady_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-    std::cout << "Operation Cost " << duration.count() << " ms." << std::endl;
+    std::cout << "SVD Correspond Handle Time Cost " << correspondHandle_timer.toc() << " ms." << std::endl;
 
     return convergence_flag_;
   }
 
-  // 没有初始配对点信息，利用kdtree进行最近邻查询的配准
+  // 进行优化处理
   bool Handle() override {
 
     // 参数打印
@@ -274,13 +275,10 @@ class SVDAligned : public RegistrationBase {
     return convergence_flag_;
   }
 
-  // 获取最终的外参
+  // 获取结果
+  void getInitTransform(Eigen::Matrix4d &init_T) override { init_T = init_T_; }
   void getRegistrationTransform(Eigen::Matrix4d &option_transform) override { option_transform = final_T_; }
-
-  // 获取origin变换后的点云
-  void getTransformedOriginCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &transformed_cloud) override {
-    pcl::transformPointCloud(*source_cloud_ptr_, *transformed_cloud, final_T_);
-  };
+  void getTransformedOriginCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &transformed_cloud) override { pcl::transformPointCloud(*source_cloud_ptr_, *transformed_cloud, final_T_); };
 };
 
 }
