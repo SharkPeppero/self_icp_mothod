@@ -20,6 +20,7 @@
 #include "icp_mothed/point2point.h"
 #include "icp_mothed/point2line.h"
 #include "icp_mothed/point2plane.h"
+#include "icp_mothed/ndt_aligned.h"
 
 void displayCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &target_cloud_ptr,
                   const pcl::PointCloud<pcl::PointXYZI>::Ptr &transformed_source_cloud_ptr) {
@@ -135,7 +136,26 @@ int main(int argc, char *argv[]) {
     pcl::PointCloud<pcl::PointXYZI>::Ptr transformed_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>());
     registration_base_ptr->getTransformedOriginCloud(transformed_cloud_ptr);
     displayCloud(target_cloud_ptr, transformed_cloud_ptr);
+    std::cout << registration_base_ptr->final_T_.matrix() << std::endl;
   } else if (mode_index == "4") {
+    // ============================ NDT 配准 ==========================
+    std::shared_ptr<Registration::RegistrationBase> registration_base_ptr = std::make_shared<Registration::NDTAligned>();
+    registration_base_ptr->setIterations(10);
+//    Eigen::Matrix4d init_T;
+//    init_T << 0.998285080, 0.050639123, -0.029369687, -0.068829313,
+//        -0.052408841, 0.996636801, -0.062995243, -0.100751962,
+//        0.026080887, 0.064426442, 0.997581586, 0.003540716,
+//        0.000000000, 0.000000000, 0.000000000, 1.000000000;
+//    registration_base_ptr->setInitT(init_T);
+    registration_base_ptr->setEpsilon(1e-6);
+    registration_base_ptr->logParameter();
+    registration_base_ptr->setInitT(Eigen::Matrix4d::Identity());
+    registration_base_ptr->setSourceCloud(source_cloud_ptr);
+    registration_base_ptr->setTargetCloud(target_cloud_ptr);
+    registration_base_ptr->Handle();
+    pcl::PointCloud<pcl::PointXYZI>::Ptr transformed_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>());
+    registration_base_ptr->getTransformedOriginCloud(transformed_cloud_ptr);
+    displayCloud(target_cloud_ptr, transformed_cloud_ptr);
 
   } else {
 

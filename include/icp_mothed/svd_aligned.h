@@ -60,12 +60,13 @@ class SVDAligned : public RegistrationBase {
     std::cout << "  init_T_target_source: " << std::endl << init_T_.matrix() << std::endl;
   }
 
-  // 给定的source以及target点云已经完成Correspond
+  // 输入的target以及source是已经配对好的
   bool correspondHandle() {
 
     // 断言检测
-    assert(target_cloud_ptr_->points.size() == source_cloud_ptr_->points.size() &&
-        !target_cloud_ptr_->points.empty());
+    assert(target_cloud_ptr_->points.empty());
+    assert(source_cloud_ptr_->points.empty());
+    assert(target_cloud_ptr_->points.size() == source_cloud_ptr_->points.size());
 
     auto start = std::chrono::steady_clock::now();
 
@@ -82,10 +83,10 @@ class SVDAligned : public RegistrationBase {
     }
 
     // Step3: 组织SVD求解前的数据形式
-    //                P(origin_cloud数据)     Q(target_cloud数据)
-    //                x0 x1 x2 ... xn        x0 x1 x2 ... xn
-    //                y0 y1 y2 ... yn        y0 y1 y2 ... yn
-    //                z0 z1 z2 ... zn        z0 z1 z2 ... zn
+    //      P(origin_cloud数据)     Q(target_cloud数据)
+    //         x0 x1 x2 ... xn        x0 x1 x2 ... xn
+    //         y0 y1 y2 ... yn        y0 y1 y2 ... yn
+    //         z0 z1 z2 ... zn        z0 z1 z2 ... zn
     Eigen::MatrixXd P(3, origin_correspond.size());
     Eigen::MatrixXd Q(3, target_correspond.size());
     for (size_t i = 0; i < origin_correspond.size(); ++i) {
@@ -227,41 +228,41 @@ class SVDAligned : public RegistrationBase {
       auto solve_end = std::chrono::steady_clock::now();
       auto solve_duration = std::chrono::duration_cast<std::chrono::milliseconds>(solve_end - solve_start);
 
+      // 结果的check
       // 计算 epsilon
       double latest_epsilon = (final_T_.block<3, 1>(0, 3) - t).norm();
+      if(latest_epsilon > epsilon_ && latest_mean_res < last_mean_res){
+        // 更新外参
+        final_T_.block<3, 3>(0, 0) = R;
+        final_T_.block<3, 1>(0, 3) = t;
 
-      // 更新外参
-      final_T_.block<3, 3>(0, 0) = R;
-      final_T_.block<3, 1>(0, 3) = t;
+        last_mean_res = latest_mean_res;
+      } else {
+        // 迭代终止判断
+        //  位姿变换足够小
+        //  总体的残差不再下降
+        if(latest_epsilon < epsilon_){
+          std::cout << "iteration epsilon is enough small, break." << std::endl;
+        }
+        if(latest_mean_res > last_mean_res){
+          std::cout << "mean res error, break." << std::endl;
+        }
+        break;
+      }
 
       auto iteration_end = std::chrono::steady_clock::now();
       auto iteration_duration = std::chrono::duration_cast<std::chrono::milliseconds>(iteration_end - iteration_start);
 
       if (use_log_flag_)
         std::cout << std::fixed << std::setprecision(9)
-        << "Registration Mode: " << getRegistrationMode(registration_mode_)
-        << " | iteration: " << iter
-        << " | epsilon: " << latest_epsilon
-        << " | mean_res: " << latest_mean_res
-        << " | manager data cost time(ms): " << manager_data_duration.count()
-        << " | solve data cost time(ms): " << solve_duration.count()
-        << " | iteration cost time(ms): " << iteration_duration.count()
-        << std::endl;
-
-      // 迭代终止判断
-      //  位姿变换足够小
-      //  总体的残差不再下降
-      if (latest_epsilon < epsilon_ || latest_mean_res > last_mean_res) {
-        if(latest_epsilon < epsilon_){
-          std::cout << "iteration epsilon is enough small, break." << std::endl;
-        }
-
-        if(latest_mean_res > last_mean_res){
-          std::cout << "mean res error, break." << std::endl;
-        }
-
-        break;
-      }
+                  << "Registration Mode: " << getRegistrationMode(registration_mode_)
+                  << " | iteration: " << iter
+                  << " | epsilon: " << latest_epsilon
+                  << " | mean_res: " << latest_mean_res
+                  << " | manager data cost time(ms): " << manager_data_duration.count()
+                  << " | solve data cost time(ms): " << solve_duration.count()
+                  << " | iteration cost time(ms): " << iteration_duration.count()
+                  << std::endl;
 
     }
     auto total_end = std::chrono::steady_clock::now();

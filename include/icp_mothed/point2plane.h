@@ -21,8 +21,8 @@ namespace Registration {
             init_T_ = Eigen::Matrix4d::Identity();
             nearest_dist_ = 5.0;
             use_tbb_flag_ = false;
-            point2plane_dist_thresh_ = 0.05;
-            knn_cnt_ = 50;
+            point2plane_dist_thresh_ = 0.005; //评价直线的参数
+            knn_cnt_ = 100;
 
             convergence_flag_ = true;
             final_T_ = Eigen::Matrix4d::Identity();
@@ -97,7 +97,7 @@ namespace Registration {
                     pcl::PointXYZI &transformed_point = transformed_cloud_ptr->points[index];
                     std::vector<int> index_vec;
                     std::vector<float> dist_vec;
-                    int num_found = target_KDtree.nearestKSearch(transformed_point, 50, index_vec, dist_vec);
+                    int num_found = target_KDtree.nearestKSearch(transformed_point, knn_cnt_, index_vec, dist_vec);
 
                     // 最近邻搜索的check
                     if (!index_vec.empty() && dist_vec.front() < nearest_dist_) {
@@ -111,8 +111,8 @@ namespace Registration {
                         }
                         Eigen::Vector3d center_point;
                         Eigen::Vector4d normal_est;
-                        if (GeometryMath::estimate_plane(searched_points, point2plane_dist_thresh_, center_point,
-                                                         normal_est)) {
+                        if (GeometryMath::estimate_plane(searched_points, point2plane_dist_thresh_,
+                                                         center_point, normal_est)) {
                             // 记录变换后的激光点位置
                             Eigen::Vector3d transformed_point_eigen(transformed_point.x, transformed_point.y,
                                                                     transformed_point.z);
@@ -167,10 +167,12 @@ namespace Registration {
 
                 } else {
                     std::cout << "RegistrationMode: " << getRegistrationMode(registration_mode_)  << " iter: " << iter << ", res: " << res_mean << std::endl;
-                    std::cout << "  [Error] registration gradient descent anomaly, ready to exit..." << std::endl;
+                    std::cout << "  registration gradient descent anomaly, ready to exit..." << std::endl;
                     break;
                 }
             }
+
+            return convergence_flag_;
         }
 
         // 获取最终的外参

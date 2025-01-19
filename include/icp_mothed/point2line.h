@@ -146,7 +146,7 @@ namespace Registration {
 
                 // 统计本次的总体点到点之间的平均残差
                 if (res_mean < last_mean_residual) {
-                    std::cout << "[point2point] iter: " << iter << ", res: " << res_mean << std::endl;
+                    std::cout << "[point2line] iter: " << iter << ", res: " << res_mean << std::endl;
 
                     // 计算delta_x
                     Eigen::Matrix<double, 6, 6> H = H_and_err.first;
@@ -165,6 +165,8 @@ namespace Registration {
                     break;
                 }
             }
+
+            return convergence_flag_;
         }
 
         // 获取最终的外参

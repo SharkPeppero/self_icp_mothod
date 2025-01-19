@@ -152,6 +152,8 @@ namespace Registration {
                     break;
                 }
             }
+
+            return convergence_flag_;
         }
 
 

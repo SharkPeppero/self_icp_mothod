@@ -16,13 +16,13 @@ endif ()
 
 # Default to C++14
 if (NOT CMAKE_CXX_STANDARD)
-    set(CMAKE_CXX_STANDARD 17)
+    set(CMAKE_CXX_STANDARD 14)
 endif ()
 
-set(CMAKE_BUILD_TYPE "Debug")
+set(CMAKE_BUILD_TYPE "release")
 
 # set cuda options
-option(USE_CUDA "Use cuda or not" ON)
+set(USE_CUDA OFF)
 if (USE_CUDA)
     MESSAGE(STATUS "USE CUDA to do registration")
     add_definitions(-DUSE_CUDA)
@@ -39,7 +39,8 @@ if (USE_CUDA)
         link_directories(usr/local/cuda-10.2/targets/aarch64-linux/lib)
         add_definitions(-D BUILD_ON_XAVIER)
     elseif ("${CMAKE_HOST_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
-        set(CUDA_LINK_DIRECTORIES_PATH "/home/xu/3rdparty/cuda_11.8/targets/x86_64-linux/lib")
+#        set(CUDA_LINK_DIRECTORIES_PATH "/home/xu/3rdparty/cuda_11.8/targets/x86_64-linux/lib")
+        set(CUDA_LINK_DIRECTORIES_PATH "usr/local/cuda-10.2/targets/aarch64-linux/lib")
         message(STATUS "CUDA link direction is: ${CUDA_LINK_DIRECTORIES_PATH}")
         link_directories(${CUDA_LINK_DIRECTORIES_PATH})
         add_definitions(-D BUILD_ON_X86)
