@@ -121,6 +121,7 @@ namespace Registration {
 
 class NDTAligned : public RegistrationBase {
  public:
+
   NDTAligned() {
     // 当前配准的模式
     registration_mode_ = RegistrationMode::NDT_ALIGNED;
@@ -150,14 +151,22 @@ class NDTAligned : public RegistrationBase {
 
   ~NDTAligned() override = default;
 
-// 参数配置接口
+  // 参数配置接口
   void setIterations(int iterations) override { iterations_ = iterations; }
   void setEpsilon(double epsilon) override { epsilon_ = epsilon; }
   void setNearestDist(double nearest_dist) override { nearest_dist_ = nearest_dist; }
   void setTBBFlag(bool use_tbb_flag) override { use_tbb_flag_ = use_tbb_flag; }
   void setLogFlag(bool use_log_flag) override { use_log_flag_ = use_log_flag; }
+  void logParameter() override {
+    std::cout << "  Registration Mode: " << getRegistrationMode(registration_mode_) << std::endl;
+    std::cout << "  iterations: " << iterations_ << std::endl;
+    std::cout << "  epsilon: " << epsilon_ << std::endl;
+    std::cout << "  nearest_dist: " << nearest_dist_ << std::endl;
+    std::cout << "  use_tbb_flag: " << (use_tbb_flag_ ? "true" : "false") << std::endl;
+    std::cout << "  init_T_target_source: " << std::endl << init_T_.matrix() << std::endl;
+  }
 
-// 输入数据接口
+  // 输入数据接口
   void setSourceCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &source_cloud_ptr) override {
     source_cloud_ptr_ = source_cloud_ptr;
   }
@@ -166,14 +175,12 @@ class NDTAligned : public RegistrationBase {
   }
   void setInitT(const Eigen::Matrix4d &init_T) override {
     init_T_ = init_T;
-    std::cout << init_T.matrix() << std::endl;
-    std::cout << init_T_.matrix() << std::endl;
   }
 
   // 进行target点云的Voxel构建
   //  构建target点云体素栅格，
   //    增量更新均值以及协方差
-  //    剔除栅格内激光点小于指定苏木
+  //    剔除栅格内激光点小于指定数目
   void buildVoxels() {
 
     // 对target点云进行体素划分并增量计算均值以及协方差矩阵
@@ -215,7 +222,7 @@ class NDTAligned : public RegistrationBase {
     if (nearby_type_ == NearbyType::CENTER) {
       nearby_search_range_.emplace_back(0, 0, 0);
     } else if (nearby_type_ == NearbyType::NEARBY6) {
-      nearby_search_range_.emplace_back(0, 0, 0);
+//      nearby_search_range_.emplace_back(0, 0, 0);
       nearby_search_range_.emplace_back(1, 0, 0);
       nearby_search_range_.emplace_back(-1, 0, 0);
       nearby_search_range_.emplace_back(0, 1, 0);
@@ -227,30 +234,33 @@ class NDTAligned : public RegistrationBase {
     }
   }
 
-  // 打印参数
-  void logParameter() override {
-    std::cout << "  Registration Mode: " << getRegistrationMode(registration_mode_) << std::endl;
-    std::cout << "  iterations: " << iterations_ << std::endl;
-    std::cout << "  epsilon: " << epsilon_ << std::endl;
-    std::cout << "  nearest_dist: " << nearest_dist_ << std::endl;
-    std::cout << "  use_tbb_flag: " << (use_tbb_flag_ ? "true" : "false") << std::endl;
-    std::cout << "  init_T_target_source: " << std::endl << init_T_.matrix() << std::endl;
+  // 设置nearby的方式
+  void setNearbyType(const NearbyType &nearby_type) {
+    nearby_type_ = nearby_type;
+  }
+
+  // 设置voxel的大小
+  void setVoxelSize(float voxel_size){
+    voxel_size_ = voxel_size;
+  }
+
+  // 设置voxel内部最小的激光点个数
+  void setMinPtsInVoxel(size_t min_pts_in_voxel){
+    min_pts_in_voxel_ = min_pts_in_voxel;
   }
 
   // 没有初始配对点信息，利用kdtree进行最近邻查询的配准
   bool Handle() override {
+    if(use_log_flag_)
+      logParameter();
+
     // 断言
     assert(target_cloud_ptr_ != nullptr);
     assert(source_cloud_ptr_ != nullptr);
     assert(!target_cloud_ptr_->points.empty());
     assert(!source_cloud_ptr_->points.empty());
 
-    std::cout << "init_T: " << std::endl;
-    std::cout << init_T_.matrix() << std::endl;
-
     final_T_ = init_T_;
-    std::cout << "final_T: " << std::endl;
-    std::cout << final_T_.matrix() << std::endl;
 
     // 拆解target点云的voxel
     buildVoxels();
@@ -382,22 +392,20 @@ class NDTAligned : public RegistrationBase {
     return convergence_flag_;
   }
 
-  // 获取最终的外参
+  // 获取结果
+  void getInitTransform(Eigen::Matrix4d &init_T) override { init_T = init_T_; }
   void getRegistrationTransform(Eigen::Matrix4d &option_transform) override { option_transform = final_T_; }
-
-  // 获取origin变换后的点云
   void getTransformedOriginCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &transformed_cloud) override {
     pcl::transformPointCloud(*source_cloud_ptr_, *transformed_cloud, final_T_);
   };
 
   // build voxel的相关参数
-  std::unordered_map<VOXEL_LOC, VoxelData> feature_map;
-  float voxel_size_;
-  size_t min_pts_in_voxel_;
+  std::unordered_map<VOXEL_LOC, VoxelData> feature_map; // 体素管理
+  float voxel_size_;                                    // 体素的大小
+  size_t min_pts_in_voxel_;                             // 体素内最小的有效激光点个数
 
-  // 构建残差的Correspondence方式
-  NearbyType nearby_type_;
-  std::vector<Eigen::Vector3i> nearby_search_range_;
+  NearbyType nearby_type_;                            // 构建残差的Correspondence方式
+  std::vector<Eigen::Vector3i> nearby_search_range_;  // nearby_type生成的搜索范围
 
 };
 

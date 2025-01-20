@@ -140,12 +140,19 @@ int main(int argc, char *argv[]) {
   } else if (mode_index == "4") {
     // ============================ NDT 配准 ==========================
     std::shared_ptr<Registration::RegistrationBase> registration_base_ptr = std::make_shared<Registration::NDTAligned>();
-    registration_base_ptr->setIterations(10);
+    // 父类属性配置
+    registration_base_ptr->setLogFlag(true);
+    registration_base_ptr->setIterations(50);
     registration_base_ptr->setEpsilon(1e-6);
-    registration_base_ptr->logParameter();
     registration_base_ptr->setInitT(Eigen::Matrix4d::Identity());
     registration_base_ptr->setSourceCloud(source_cloud_ptr);
     registration_base_ptr->setTargetCloud(target_cloud_ptr);
+    auto ndt_registration_ptr = std::dynamic_pointer_cast<Registration::NDTAligned>(registration_base_ptr);
+    // 子类属性配置
+    ndt_registration_ptr->setMinPtsInVoxel(30);
+    ndt_registration_ptr->setNearbyType(NearbyType::CENTER);
+    ndt_registration_ptr->setVoxelSize(0.05);
+
     registration_base_ptr->Handle();
     pcl::PointCloud<pcl::PointXYZI>::Ptr transformed_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>());
     registration_base_ptr->getTransformedOriginCloud(transformed_cloud_ptr);

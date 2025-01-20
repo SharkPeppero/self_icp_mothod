@@ -153,7 +153,7 @@ class Point2PointRegistration : public RegistrationBase {
     return convergence_flag_;
   }
 
-  // 获取初始外参
+  // 获取结果
   void getInitTransform(Eigen::Matrix4d &init_T) override { init_T = init_T_; }
   void getRegistrationTransform(Eigen::Matrix4d &option_transform) override { option_transform = final_T_; }
   void getTransformedOriginCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &transformed_cloud) override {

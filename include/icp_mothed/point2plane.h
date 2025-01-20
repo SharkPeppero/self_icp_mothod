@@ -176,17 +176,15 @@ class Point2PlaneRegistration : public RegistrationBase {
     return convergence_flag_;
   }
 
-  // 获取最终的外参
+  // 获取结果
+  void getInitTransform(Eigen::Matrix4d &init_T) override { init_T = init_T_; }
   void getRegistrationTransform(Eigen::Matrix4d &option_transform) override { option_transform = final_T_; }
-
-  // 获取origin变换后的点云
   void getTransformedOriginCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &transformed_cloud) override {
     pcl::transformPointCloud(*source_cloud_ptr_, *transformed_cloud, final_T_);
   };
 
   double point2plane_dist_thresh_;
   int knn_cnt_;
-
 };
 }
 

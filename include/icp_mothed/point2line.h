@@ -18,50 +18,51 @@ class Point2LineRegistration : public RegistrationBase {
 
     iterations_ = 10;
     epsilon_ = 1e-6;
-    init_T_ = Eigen::Matrix4d::Identity();
     nearest_dist_ = 5.0;
     use_tbb_flag_ = false;
-    point2line_dist_thresh_ = 0.1;
+    use_log_flag_ = false;
+
+    init_T_ = Eigen::Matrix4d::Identity();
+    source_cloud_ptr_ = boost::make_shared<pcl::PointCloud<pcl::PointXYZI>>();
+    target_cloud_ptr_ = boost::make_shared<pcl::PointCloud<pcl::PointXYZI>>();
 
     convergence_flag_ = true;
     final_T_ = Eigen::Matrix4d::Identity();
 
-    source_cloud_ptr_ = boost::make_shared<pcl::PointCloud<pcl::PointXYZI>>();
-    target_cloud_ptr_ = boost::make_shared<pcl::PointCloud<pcl::PointXYZI>>();
+    point2line_dist_thresh_ = 0.1;
   }
 
   ~Point2LineRegistration() override = default;
 
   // 配置参数
   void setIterations(int iterations) override { iterations_ = iterations; }
-
   void setEpsilon(double epsilon) override { epsilon_ = epsilon; }
-
   void setNearestDist(double nearest_dist) override { nearest_dist_ = nearest_dist; }
-
   void setTBBFlag(bool use_tbb_flag) override { use_tbb_flag_ = use_tbb_flag; }
+  void setLogFlag(bool use_log_flag) override { use_log_flag_ = use_log_flag; }
+  void logParameter() override {
+    std::cout << "  Registration Mode: " << getRegistrationMode(registration_mode_) << std::endl;
+    std::cout << "    iterations: " << iterations_ << std::endl;
+    std::cout << "    epsilon: " << epsilon_ << std::endl;
+    std::cout << "    nearest_dist: " << nearest_dist_ << std::endl;
+    std::cout << "    use_tbb_flag: " << (use_tbb_flag_ ? "true" : "false") << std::endl;
+    std::cout << "    init_T_target_source: " << std::endl << init_T_.matrix() << std::endl;
+  }
 
   // 配置输入参数
-  void setSourceCloud(
-      const pcl::PointCloud<pcl::PointXYZI>::Ptr &source_cloud_ptr) override { source_cloud_ptr_ = source_cloud_ptr; }
-
-  void setTargetCloud(
-      const pcl::PointCloud<pcl::PointXYZI>::Ptr &target_cloud_ptr) override { target_cloud_ptr_ = target_cloud_ptr; }
-
-  void setInitT(const Eigen::Matrix4d &init_T) override { init_T_ = init_T; }
-
-  // 打印参数
-  void logParameter() override {
-    std::cout << " Point2Line Parameters: " << std::endl;
-    std::cout << "  Mode: " << getRegistrationMode(registration_mode_) << std::endl;
-    std::cout << "  iterations: " << iterations_ << std::endl;
-    std::cout << std::fixed << std::setprecision(9) << "  epsilon: " << epsilon_ << std::endl;
-    std::cout << "  nearest_dist: " << nearest_dist_ << std::endl;
-    std::cout << "  use_tbb_flag: " << (use_tbb_flag_ ? "true" : "false") << std::endl;
+  void setSourceCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &source_cloud_ptr) override {
+    source_cloud_ptr_ = source_cloud_ptr;
   }
+  void setTargetCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &target_cloud_ptr) override {
+    target_cloud_ptr_ = target_cloud_ptr;
+  }
+  void setInitT(const Eigen::Matrix4d &init_T) override { init_T_ = init_T; }
 
   // 点到点的icp
   bool Handle() override {
+    if (use_log_flag_)
+      logParameter();
+
     // 断言检测
     assert(!target_cloud_ptr_->points.empty());
     assert(!source_cloud_ptr_->points.empty());
@@ -169,10 +170,9 @@ class Point2LineRegistration : public RegistrationBase {
     return convergence_flag_;
   }
 
-  // 获取最终的外参
+  // 获取结果
+  void getInitTransform(Eigen::Matrix4d &init_T) override { init_T = init_T_; }
   void getRegistrationTransform(Eigen::Matrix4d &option_transform) override { option_transform = final_T_; }
-
-  // 获取origin变换后的点云
   void getTransformedOriginCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &transformed_cloud) override {
     pcl::transformPointCloud(*source_cloud_ptr_, *transformed_cloud, final_T_);
   };
