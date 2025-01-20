@@ -141,12 +141,6 @@ int main(int argc, char *argv[]) {
     // ============================ NDT 配准 ==========================
     std::shared_ptr<Registration::RegistrationBase> registration_base_ptr = std::make_shared<Registration::NDTAligned>();
     registration_base_ptr->setIterations(10);
-//    Eigen::Matrix4d init_T;
-//    init_T << 0.998285080, 0.050639123, -0.029369687, -0.068829313,
-//        -0.052408841, 0.996636801, -0.062995243, -0.100751962,
-//        0.026080887, 0.064426442, 0.997581586, 0.003540716,
-//        0.000000000, 0.000000000, 0.000000000, 1.000000000;
-//    registration_base_ptr->setInitT(init_T);
     registration_base_ptr->setEpsilon(1e-6);
     registration_base_ptr->logParameter();
     registration_base_ptr->setInitT(Eigen::Matrix4d::Identity());

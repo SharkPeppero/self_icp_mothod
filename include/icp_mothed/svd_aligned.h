@@ -7,10 +7,6 @@
 
 #include "registration_base.h"
 
-/**
- * 基于SVD实现点云配准
- */
-
 namespace Registration {
 
 class SVDAligned : public RegistrationBase {
@@ -27,14 +23,14 @@ class SVDAligned : public RegistrationBase {
     use_tbb_flag_ = false;
     use_log_flag_ = false;
 
-    // SVD最终的结果
-    convergence_flag_ = true;
-    final_T_ = Eigen::Matrix4d::Identity();
-
-    // 输入的点云数据
+    // 输入参数
     init_T_ = Eigen::Matrix4d::Identity();
     source_cloud_ptr_ = boost::make_shared<pcl::PointCloud<pcl::PointXYZI>>();
     target_cloud_ptr_ = boost::make_shared<pcl::PointCloud<pcl::PointXYZI>>();
+
+    // 输出结果
+    convergence_flag_ = true;
+    final_T_ = Eigen::Matrix4d::Identity();
   }
 
   ~SVDAligned() override = default;
@@ -47,19 +43,23 @@ class SVDAligned : public RegistrationBase {
   void setLogFlag(bool use_log_flag) override { use_log_flag_ = use_log_flag; }
   void logParameter() override {
     std::cout << "  Registration Mode: " << getRegistrationMode(registration_mode_) << std::endl;
-    std::cout << "  iterations: " << iterations_ << std::endl;
-    std::cout << "  epsilon: " << epsilon_ << std::endl;
-    std::cout << "  nearest_dist: " << nearest_dist_ << std::endl;
-    std::cout << "  use_tbb_flag: " << (use_tbb_flag_ ? "true" : "false") << std::endl;
-    std::cout << "  init_T_target_source: " << std::endl << init_T_.matrix() << std::endl;
+    std::cout << "    iterations: " << iterations_ << std::endl;
+    std::cout << "    epsilon: " << epsilon_ << std::endl;
+    std::cout << "    nearest_dist: " << nearest_dist_ << std::endl;
+    std::cout << "    use_tbb_flag: " << (use_tbb_flag_ ? "true" : "false") << std::endl;
+    std::cout << "    init_T_target_source: " << std::endl << init_T_.matrix() << std::endl;
   }
 
   // 配置输入的参数
-  void setSourceCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &source_cloud_ptr) override { source_cloud_ptr_ = source_cloud_ptr; }
-  void setTargetCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &target_cloud_ptr) override { target_cloud_ptr_ = target_cloud_ptr; }
+  void setSourceCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &source_cloud_ptr) override {
+    source_cloud_ptr_ = source_cloud_ptr;
+  }
+  void setTargetCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &target_cloud_ptr) override {
+    target_cloud_ptr_ = target_cloud_ptr;
+  }
   void setInitT(const Eigen::Matrix4d &init_T) override { init_T_ = init_T; }
 
-  // 已知配对点对求解变换的外参
+  // 两套求解方式
   bool correspondHandle() {
 
     // 参数打印
@@ -141,8 +141,8 @@ class SVDAligned : public RegistrationBase {
       logParameter();
 
     // 断言
-    assert(!source_cloud_ptr_->points.empty());
     assert(!target_cloud_ptr_->points.empty());
+    assert(!source_cloud_ptr_->points.empty());
 
     // 配置target点云的kdtree
     pcl::KdTreeFLANN<pcl::PointXYZI> target_KDtree;
@@ -171,8 +171,12 @@ class SVDAligned : public RegistrationBase {
         std::vector<float> dist;
         target_KDtree.nearestKSearch(transformed_cloud_ptr->points[i], 1, idx, dist);
         if (dist.front() <= nearest_dist_) {
-          origin_correspond.emplace_back(source_cloud_ptr_->points[i].x, source_cloud_ptr_->points[i].y, source_cloud_ptr_->points[i].z);
-          target_correspond.emplace_back(target_cloud_ptr_->points[idx[0]].x, target_cloud_ptr_->points[idx[0]].y, target_cloud_ptr_->points[idx[0]].z);
+          origin_correspond.emplace_back(source_cloud_ptr_->points[i].x,
+                                         source_cloud_ptr_->points[i].y,
+                                         source_cloud_ptr_->points[i].z);
+          target_correspond.emplace_back(target_cloud_ptr_->points[idx[0]].x,
+                                         target_cloud_ptr_->points[idx[0]].y,
+                                         target_cloud_ptr_->points[idx[0]].z);
 
           Eigen::Vector3d err(target_cloud_ptr_->points[idx[0]].x - transformed_cloud_ptr->points[i].x,
                               target_cloud_ptr_->points[idx[0]].y - transformed_cloud_ptr->points[i].y,
@@ -182,8 +186,8 @@ class SVDAligned : public RegistrationBase {
         }
       }
       auto manager_data_end = std::chrono::steady_clock::now();
-      auto manager_data_duration = std::chrono::duration_cast<std::chrono::milliseconds>(manager_data_end - manager_data_start);
-
+      auto manager_data_duration =
+          std::chrono::duration_cast<std::chrono::milliseconds>(manager_data_end - manager_data_start);
 
       auto solve_start = std::chrono::steady_clock::now();
       // Step3: 组织SVD求解前的数据形式
@@ -232,7 +236,7 @@ class SVDAligned : public RegistrationBase {
       // 结果的check
       // 计算 epsilon
       double latest_epsilon = (final_T_.block<3, 1>(0, 3) - t).norm();
-      if(latest_epsilon > epsilon_ && latest_mean_res < last_mean_res){
+      if (latest_epsilon > epsilon_ && latest_mean_res < last_mean_res) {
         // 更新外参
         final_T_.block<3, 3>(0, 0) = R;
         final_T_.block<3, 1>(0, 3) = t;
@@ -242,10 +246,10 @@ class SVDAligned : public RegistrationBase {
         // 迭代终止判断
         //  位姿变换足够小
         //  总体的残差不再下降
-        if(latest_epsilon < epsilon_){
+        if (latest_epsilon < epsilon_) {
           std::cout << "iteration epsilon is enough small, break." << std::endl;
         }
-        if(latest_mean_res > last_mean_res){
+        if (latest_mean_res > last_mean_res) {
           std::cout << "mean res error, break." << std::endl;
         }
         break;
@@ -268,8 +272,10 @@ class SVDAligned : public RegistrationBase {
     }
     auto total_end = std::chrono::steady_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(total_end - total_start);
-    if(use_log_flag_)
-      std::cout << std::fixed << std::setprecision(9) << "Registration Mode: " << getRegistrationMode(registration_mode_) << " | Total Cost Time: " << duration.count() << " ms." << std::endl;
+    if (use_log_flag_)
+      std::cout << std::fixed << std::setprecision(9) << "Registration Mode: "
+                << getRegistrationMode(registration_mode_) << " | Total Cost Time: " << duration.count() << " ms."
+                << std::endl;
 
     // todo: 添加点云配准的收敛判断
     return convergence_flag_;
@@ -278,7 +284,9 @@ class SVDAligned : public RegistrationBase {
   // 获取结果
   void getInitTransform(Eigen::Matrix4d &init_T) override { init_T = init_T_; }
   void getRegistrationTransform(Eigen::Matrix4d &option_transform) override { option_transform = final_T_; }
-  void getTransformedOriginCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &transformed_cloud) override { pcl::transformPointCloud(*source_cloud_ptr_, *transformed_cloud, final_T_); };
+  void getTransformedOriginCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &transformed_cloud) override {
+    pcl::transformPointCloud(*source_cloud_ptr_, *transformed_cloud, final_T_);
+  };
 };
 
 }

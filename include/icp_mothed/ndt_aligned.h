@@ -165,7 +165,6 @@ class NDTAligned : public RegistrationBase {
     target_cloud_ptr_ = target_cloud_ptr;
   }
   void setInitT(const Eigen::Matrix4d &init_T) override {
-    std::cout << __LINE__ << std::endl;
     init_T_ = init_T;
     std::cout << init_T.matrix() << std::endl;
     std::cout << init_T_.matrix() << std::endl;

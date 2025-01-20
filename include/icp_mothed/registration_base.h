@@ -210,7 +210,7 @@ bool estimate_line(std::vector<Eigen::Vector3d> &points,
  * @param out       输出的归一化后的平面方程
  * @return
  */
-// fastlio中进行平面参数估计的方式，前提是场景有大面积平面特征，都是角点，估计不准平面（雕塑场景）
+// fastlio 中进行平面参数估计的方式，前提是场景有大面积平面特征，都是角点，估计不准平面（雕塑场景）
 bool estimate_plane(std::vector<Eigen::Vector3d> &points,
                     const double &thresh,
                     Eigen::Vector3d &mean,
@@ -259,6 +259,10 @@ bool estimate_plane(std::vector<Eigen::Vector3d> &points,
   return true;
 }
 
+/**
+ * Todo: SVD进行平面特征求解
+ */
+
 }
 
 // 点云配准
@@ -272,7 +276,8 @@ enum RegistrationMode {
   Point2Plane,
   NDT_ALIGNED,
   NICP,
-  IMSL_ICP,
+  IMLS_ICP,
+  GICP,
 };
 
 std::string getRegistrationMode(const RegistrationMode &registrationMode) {
@@ -290,7 +295,7 @@ std::string getRegistrationMode(const RegistrationMode &registrationMode) {
       break;
     case RegistrationMode::NICP:mode_name = std::string("NICP");
       break;
-    case RegistrationMode::IMSL_ICP:mode_name = std::string("IMSL_ICP");
+    case RegistrationMode::IMLS_ICP:mode_name = std::string("IMLS_ICP");
       break;
     default:mode_name = std::string("Unknown Registration Mode");
       break;
@@ -298,16 +303,6 @@ std::string getRegistrationMode(const RegistrationMode &registrationMode) {
   return mode_name;
 }
 
-/**
- * @brief
- *
- * 基类的基础变量:
- *  迭代次数   iterations
- *  提前退出   epsilon
- *  配准初值   init_T
- *  是否使用TBB加速 tbb_flag
- *
- */
 class RegistrationBase {
  public:
   RegistrationBase() {}
@@ -323,8 +318,12 @@ class RegistrationBase {
   virtual void logParameter() { std::cout << "去子类进行实现..." << std::endl; }
 
   // 配置输入的参数
-  virtual void setSourceCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &source_cloud_ptr) { std::cout << "去子类进行实现..." << std::endl; }
-  virtual void setTargetCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &target_cloud_ptr) { std::cout << "去子类进行实现..." << std::endl; }
+  virtual void setSourceCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &source_cloud_ptr) {
+    std::cout << "去子类进行实现..." << std::endl;
+  }
+  virtual void setTargetCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &target_cloud_ptr) {
+    std::cout << "去子类进行实现..." << std::endl;
+  }
   virtual void setInitT(const Eigen::Matrix4d &init_T) { std::cout << "去子类进行实现..." << std::endl; }
 
   // 进行优化处理
@@ -332,8 +331,12 @@ class RegistrationBase {
 
   // 获取结果
   virtual void getInitTransform(Eigen::Matrix4d &init_T) { std::cout << "去子类进行实现..." << std::endl; }
-  virtual void getRegistrationTransform(Eigen::Matrix4d &option_transform) { std::cout << "去子类进行实现..." << std::endl; }
-  virtual void getTransformedOriginCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &transformed_cloud) { std::cout << "去子类进行实现..." << std::endl; };
+  virtual void getRegistrationTransform(Eigen::Matrix4d &option_transform) {
+    std::cout << "去子类进行实现..." << std::endl;
+  }
+  virtual void getTransformedOriginCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &transformed_cloud) {
+    std::cout << "去子类进行实现..." << std::endl;
+  };
 
   RegistrationMode registration_mode_; // 配准模式
 
@@ -347,8 +350,8 @@ class RegistrationBase {
   pcl::PointCloud<pcl::PointXYZI>::Ptr target_cloud_ptr_ = nullptr;
   pcl::PointCloud<pcl::PointXYZI>::Ptr source_cloud_ptr_ = nullptr;
 
-  Eigen::Matrix4d final_T_; // 最终的外参
   bool convergence_flag_{}; // 是否收敛
+  Eigen::Matrix4d final_T_; // 最终的外参
 };
 }
 
