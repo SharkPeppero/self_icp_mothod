@@ -12,7 +12,6 @@
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
 #include <pcl/visualization/pcl_visualizer.h>
-#include <pcl/registration/icp.h>
 #include <pcl/filters/voxel_grid.h>
 
 #include "icp_mothed/registration_base.h"
@@ -82,14 +81,16 @@ int main(int argc, char *argv[]) {
 
   if (mode_index == "0") {
     // ============================ SVD配准 =================================
-    std::shared_ptr<Registration::RegistrationBase> registration_base_ptr = std::make_shared<Registration::SVDAligned>();
+    std::shared_ptr<Registration::RegistrationBase>
+        registration_base_ptr = std::make_shared<Registration::SVDAligned>();
     registration_base_ptr->setLogFlag(true);
     registration_base_ptr->setIterations(50);
     registration_base_ptr->setEpsilon(1e-6);
     registration_base_ptr->setInitT(Eigen::Matrix4d::Identity());
     registration_base_ptr->setSourceCloud(source_cloud_ptr);
     registration_base_ptr->setTargetCloud(target_cloud_ptr);
-    std::shared_ptr<Registration::SVDAligned> svd_registration = std::dynamic_pointer_cast<Registration::SVDAligned>(registration_base_ptr);
+    std::shared_ptr<Registration::SVDAligned>
+        svd_registration = std::dynamic_pointer_cast<Registration::SVDAligned>(registration_base_ptr);
     svd_registration->Handle();
 
     pcl::PointCloud<pcl::PointXYZI>::Ptr transformed_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>());
@@ -97,7 +98,8 @@ int main(int argc, char *argv[]) {
     displayCloud(target_cloud_ptr, transformed_cloud_ptr);
   } else if (mode_index == "1") {
     // ============================ point2point 配准 =======================
-    std::shared_ptr<Registration::RegistrationBase> registration_base_ptr = std::make_shared<Registration::Point2PointRegistration>();
+    std::shared_ptr<Registration::RegistrationBase>
+        registration_base_ptr = std::make_shared<Registration::Point2PointRegistration>();
     registration_base_ptr->setIterations(50);
     registration_base_ptr->setEpsilon(1e-6);
     registration_base_ptr->logParameter();
@@ -111,7 +113,8 @@ int main(int argc, char *argv[]) {
 
   } else if (mode_index == "2") {
     // ============================ point2line 配准 ==========================
-    std::shared_ptr<Registration::RegistrationBase> registration_base_ptr = std::make_shared<Registration::Point2LineRegistration>();
+    std::shared_ptr<Registration::RegistrationBase>
+        registration_base_ptr = std::make_shared<Registration::Point2LineRegistration>();
     registration_base_ptr->setIterations(50);
     registration_base_ptr->setEpsilon(1e-6);
     registration_base_ptr->logParameter();
@@ -125,7 +128,8 @@ int main(int argc, char *argv[]) {
 
   } else if (mode_index == "3") {
     // ============================ point2Plane 配准 ==========================
-    std::shared_ptr<Registration::RegistrationBase> registration_base_ptr = std::make_shared<Registration::Point2PlaneRegistration>();
+    std::shared_ptr<Registration::RegistrationBase>
+        registration_base_ptr = std::make_shared<Registration::Point2PlaneRegistration>();
     registration_base_ptr->setIterations(50);
     registration_base_ptr->setEpsilon(1e-6);
     registration_base_ptr->logParameter();
@@ -139,7 +143,8 @@ int main(int argc, char *argv[]) {
     std::cout << registration_base_ptr->final_T_.matrix() << std::endl;
   } else if (mode_index == "4") {
     // ============================ NDT 配准 ==========================
-    std::shared_ptr<Registration::RegistrationBase> registration_base_ptr = std::make_shared<Registration::NDTAligned>();
+    std::shared_ptr<Registration::RegistrationBase>
+        registration_base_ptr = std::make_shared<Registration::NDTAligned>();
     // 父类属性配置
     registration_base_ptr->setLogFlag(true);
     registration_base_ptr->setIterations(50);
@@ -158,10 +163,15 @@ int main(int argc, char *argv[]) {
     registration_base_ptr->getTransformedOriginCloud(transformed_cloud_ptr);
     displayCloud(target_cloud_ptr, transformed_cloud_ptr);
 
+  } else if (mode_index == "5") {
+    // ============================ IMSL_ICP 配准 ==========================
+  } else if (mode_index == "6") {
+    // ============================ NICP 配准 ==========================
+  } else if (mode_index == "7") {
+    // ============================  配准 ==========================
   } else {
 
   }
 
-  return 0;
-
+  return EXIT_SUCCESS;
 }
