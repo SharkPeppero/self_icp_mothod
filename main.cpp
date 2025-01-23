@@ -164,7 +164,8 @@ int main(int argc, char *argv[]) {
     displayCloud(target_cloud_ptr, transformed_cloud_ptr);
 
   } else if (mode_index == "5") {
-    // ============================ IMSL_ICP 配准 ==========================
+    // ============================ NICP 配准 ==========================
+
   } else if (mode_index == "6") {
     // ============================ NICP 配准 ==========================
   } else if (mode_index == "7") {

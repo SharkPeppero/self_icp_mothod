@@ -357,6 +357,12 @@ class NDTAligned : public RegistrationBase {
             // 构建海森矩阵部分进行累加
             H += J.transpose() * iter->second.getInformation() * J;
             b += -1.0 * J.transpose() * iter->second.getInformation() * err;
+
+            /**
+             *  加权最小二乘 与 普通最小二乘
+             * JT * J * delta_x = -1 * JT * err
+             * JT *  sigmod * J * delta_x = -1 * JT * sigmod * err
+             */
           }
         }
 
