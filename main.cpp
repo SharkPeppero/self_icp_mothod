@@ -20,6 +20,9 @@
 #include "icp_mothed/point2line.h"
 #include "icp_mothed/point2plane.h"
 #include "icp_mothed/ndt_aligned.h"
+#include "icp_mothed/nicp_registration.h"
+
+#include "cluster/dbscan.h"
 
 void displayCloud(const pcl::PointCloud<pcl::PointXYZI>::Ptr &target_cloud_ptr,
                   const pcl::PointCloud<pcl::PointXYZI>::Ptr &transformed_source_cloud_ptr) {
@@ -78,6 +81,9 @@ int main(int argc, char *argv[]) {
   }
   printf("source cloud size: %ld\n", source_cloud_ptr->points.size());
   printf("target cloud size: %ld\n", target_cloud_ptr->points.size());
+
+  std::string debug_path = DEBUG_PATH;
+  printf("debug reference path: %s\n", debug_path.c_str());
 
   if (mode_index == "0") {
     // ============================ SVD配准 =================================
@@ -165,11 +171,74 @@ int main(int argc, char *argv[]) {
 
   } else if (mode_index == "5") {
     // ============================ NICP 配准 ==========================
+    std::shared_ptr<Registration::RegistrationBase>
+        registration_base_ptr = std::make_shared<Registration::NICPRegistration>();
+    // 父类属性配置
+    registration_base_ptr->setLogFlag(true);
+    registration_base_ptr->setIterations(50);
+    registration_base_ptr->setEpsilon(1e-6);
+    registration_base_ptr->setInitT(Eigen::Matrix4d::Identity());
+    registration_base_ptr->setSourceCloud(source_cloud_ptr);
+    registration_base_ptr->setTargetCloud(target_cloud_ptr);
+
+    registration_base_ptr->Handle();
+    pcl::PointCloud<pcl::PointXYZI>::Ptr transformed_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>());
+    registration_base_ptr->getTransformedOriginCloud(transformed_cloud_ptr);
+    displayCloud(target_cloud_ptr, transformed_cloud_ptr);
 
   } else if (mode_index == "6") {
     // ============================ NICP 配准 ==========================
   } else if (mode_index == "7") {
     // ============================  配准 ==========================
+  } else if (mode_index == "10") {
+    // ============================ 执行DBSCAN ========================
+    // 体素下采样
+    pcl::VoxelGrid<PointType> voxel_grid;
+    voxel_grid.setInputCloud(target_cloud_ptr);
+    voxel_grid.setLeafSize(0.2, 0.2, 0.2);  // 设置体素大小
+    voxel_grid.filter(*target_cloud_ptr);  // 执行下采样
+
+    std::shared_ptr<clustering::ClusterBase> cluster_base_ptr =
+        std::make_shared<clustering::DBSCAN>();
+    cluster_base_ptr->setInput(target_cloud_ptr);
+    std::shared_ptr<clustering::DBSCAN> dbscan_ptr =
+        std::dynamic_pointer_cast<clustering::DBSCAN>(cluster_base_ptr);
+    dbscan_ptr->setEpsilon(1.0);
+    dbscan_ptr->setMinPts(30);
+
+    cluster_base_ptr->Handle();
+
+    std::cout << "cluster size: " << cluster_base_ptr->cluster_res_.size() << std::endl;
+    if (!cluster_base_ptr->cluster_res_.empty()) {
+      pcl::PointCloud<pcl::PointXYZRGB>::Ptr colored_cloud(new pcl::PointCloud<pcl::PointXYZRGB>());
+
+      // 为每个聚类分配不同的颜色
+      int cluster_idx = 0;
+      for (const auto &cluster_pair : cluster_base_ptr->cluster_res_) {
+        CloudType::Ptr cluster = cluster_pair.second;
+        for (size_t i = 0; i < cluster->points.size(); ++i) {
+          pcl::PointXYZRGB point;
+          point.x = cluster->points[i].x;
+          point.y = cluster->points[i].y;
+          point.z = cluster->points[i].z;
+
+          // 给每个聚类分配不同的颜色
+          point.r = static_cast<uint8_t>((cluster_idx * 50) % 256);  // 红色分量
+          point.g = static_cast<uint8_t>((cluster_idx * 100) % 256); // 绿色分量
+          point.b = static_cast<uint8_t>((cluster_idx * 150) % 256); // 蓝色分量
+
+          colored_cloud->points.push_back(point);
+        }
+        cluster_idx++;
+      }
+
+      colored_cloud->height = 1;
+      colored_cloud->width = colored_cloud->points.size();
+
+      std::string debug_pcd_path = debug_path + "clustering.pcd";
+      pcl::io::savePCDFile(debug_pcd_path, *colored_cloud);
+    }
+
   } else {
 
   }

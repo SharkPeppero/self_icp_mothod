@@ -19,7 +19,11 @@ if (NOT CMAKE_CXX_STANDARD)
     set(CMAKE_CXX_STANDARD 14)
 endif ()
 
-set(CMAKE_BUILD_TYPE "release")
+# set save reference path
+add_definitions(-DDEBUG_PATH="${CMAKE_CURRENT_SOURCE_DIR}/debug_path/")
+message(STATUS "DEBUG_PATH: ${CMAKE_CURRENT_SOURCE_DIR}/debug_path/")
+
+set(CMAKE_BUILD_TYPE "Debug")
 
 # set cuda options
 set(USE_CUDA OFF)

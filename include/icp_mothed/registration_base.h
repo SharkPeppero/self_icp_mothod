@@ -16,6 +16,7 @@
 #include "pcl/point_types.h"
 #include <pcl/common/transforms.h>
 #include <pcl/kdtree/kdtree_flann.h>
+#include <pcl/io/pcd_io.h>
 
 // Tools
 namespace tools {
